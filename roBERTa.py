@@ -14,9 +14,8 @@ MODEL = amsc.from_pretrained(MODEL_TYPE)
 #Id,ProductId,UserId,ProfileName,HelpfulnessNumerator,HelpfulnessDenominator,Score,Time,Summary,Text
 
 df = pd.read_csv('./Reviews.csv')
-df = df.head(1000)
-
-exmp = df['Text'].values[0]
+df = df.head(10000)
+# df.set_index('Id', inplace=True)
 
 def polarity_scores_roberta(e):
     encoded_text = TOKENIZER(e, return_tensors='pt')
@@ -33,52 +32,94 @@ def polarity_scores_roberta(e):
     return scores_dict
 
 # EVALUATE
-res = {}
-df_len = len(df)
+# res = {}
+# df_len = len(df)
 
-for i, row in tqdm(df.iterrows(), total=df_len):
-    try:
-        text = row['Text']
-        myId = row['Id']
-        roberta_result = polarity_scores_roberta(text)
-        res[myId] = roberta_result
-    except RuntimeError:
-        print(f'Broke at {myId}')
+# for i, row in tqdm(df.iterrows(), total=df_len):
+#     try:
+#         text = row['Text']
+#         myId = row['Id']
+#         roberta_result = polarity_scores_roberta(text)
+#         res[myId] = roberta_result
+#     except RuntimeError:
+#         print(f'Broke at {myId}')
 
-res_df = pd.DataFrame(res).T
-res_df.to_csv('RoBERTa_Result.csv')
+# res_df = pd.DataFrame(res).T
+# res_df.to_csv('RoBERTa_Result.csv')
 
 
 # PROCESS
-res_df = pd.read_csv('./RoBERTa_Result.csv')
-negative_count = 0
+res_df = pd.read_csv('./RoBERTa_Result.csv') # Id nya harus tambahin manual gw males
+
+predicted_negative = []
+predicted_neutral = []
+predicted_postivie = []
+
 false_negative = []
+false_neutral = []
+false_positive = []
+
+true_negative = []
+true_neutral = []
+true_positive = []
 
 for idx, result in res_df.iterrows():
-    if result['roberta_neg'] > result['roberta_pos'] and result['roberta_neg'] > result['roberta_neu']:
-        score = df.loc[df['Id'] == idx+1, 'Score'].iloc[0]
-        # print(f"Id: {idx} - Negative Sentiment: {result['roberta_neg']} - Score: {score}")
-        # print(f"- Text: {result['text']}")
-        negative_count += 1
-        if score > 3:
-            print(f"Negative Sentiment: {result['roberta_neg']}\nActual Score: {score}\nText:{result['text']}\n\n")
+    score = df.loc[df['Id'] == idx+1, 'Score'].iloc[0]
+    #we will assume that 3 is neutral
+    
+
+    if score < 3: # case actually negative
+        true_negative.append(result)
+    elif score == 3: # case actually neutral
+        true_neutral.append(result)
+    elif score > 3 :
+        true_positive.append(result)
+
+
+    if result['roberta_neg'] > result['roberta_pos'] and result['roberta_neg'] > result['roberta_neu']: # case where negative is dominant
+        predicted_negative.append(result)
+        if score > 3: # false negatives
             false_negative.append(result)
+    elif result['roberta_neu'] > result['roberta_neg'] and result['roberta_neu'] > result['roberta_pos']:
+        predicted_neutral.append(result)
+        if score != 3:
+            false_neutral.append(result)
+    elif result['roberta_pos'] > result['roberta_neg'] and result['roberta_pos'] > result['roberta_neu']:
+        predicted_postivie.append(result)
+        if score < 3:
+            false_positive.append(result)
+        
 
-print(f'Negative Count:{negative_count}, False Negative (>3):{len(false_negative)}, Percentage: {(len(false_negative)/negative_count)*100}')
+def delta(true_values, pred_values):
+    true_set = set(true_values)
+    fake_predictions = []
+    for predicted in pred_values:
+        if predicted not in true_set:
+            fake_predictions.append(predicted)
+    return fake_predictions
 
+def plot_all_comparisons(true_negatives, predicted_negatives, false_negatives, true_positives, predicted_positives, false_positives, true_neutrals, predicted_neutrals, false_neutrals):
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))  # 1 row, 3 columns of subplots
 
-# PLOT
-def plot():
-    evaluate_data = [len(res_df), negative_count, len(false_negative)]
-    labels = ['Total Data', 'Negative Sentiment', 'False Negatives (>3)']
+    data = [
+        (true_negatives, predicted_negatives, false_negatives, 'Negatives'),
+        (true_positives, predicted_positives, false_positives, 'Positives'),
+        (true_neutrals, predicted_neutrals, false_neutrals,'Neutrals')
+    ]
+    
+    colors = ['blue', 'green', 'red']
 
-    plt.figure(figsize=(8, 4))
-    plt.bar(labels, evaluate_data, color=['green', 'blue', 'red'])
+    for ax, (true_data, predicted_data, false_prediction, title) in zip(axes, data):
+        categories = ['True ' + title, 'Predicted ' + title, 'False ' + title]
+        counts = [len(true_data), len(predicted_data), len(false_prediction)]
+        ax.bar(categories, counts, color=colors)
+        ax.set_title('True vs Predicted vs False ' + title)
+        ax.set_xlabel('Category')
+        ax.set_ylabel('Count')
+        ax.set_ylim(0, max(counts) + 10)
 
-    plt.title('roBERTa')
-    plt.xlabel('Categories')
-    plt.ylabel('Count')
-
+    plt.tight_layout()
     plt.show()
 
-plot()
+
+plot_all_comparisons(true_negative, predicted_negative, false_negative, true_positive, predicted_postivie, false_positive, true_neutral, predicted_neutral, false_neutral)
