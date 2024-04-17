@@ -29,7 +29,6 @@ def polarity_scores_roberta(e):
         'roberta_pos': scores[2],
         'text':e
     }
-
     return scores_dict
 
 # EVALUATE
