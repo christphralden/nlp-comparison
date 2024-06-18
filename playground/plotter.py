@@ -10,7 +10,7 @@ def plot_comparisons(test_df):
     false_neutral = {'bert_cnn': [], 'roberta': []}
     false_positive = {'bert_cnn': [], 'roberta': []}
 
-    true_negative = {'bert_cnn': [], 'roberta': []}
+   true_negative = {'bert_cnn': [], 'roberta': []}
     true_neutral = {'bert_cnn': [], 'roberta': []}
     true_positive = {'bert_cnn': [], 'roberta': []}
 
