@@ -1,0 +1,9 @@
+# pandas==1.5.3 
+# torch==2.0.1 
+# transformers==4.30.2 
+# h5py==3.8.0
+
+pandas==1.5.3
+torch==1.13.1
+transformers==4.29.2
+h5py==3.8.0
